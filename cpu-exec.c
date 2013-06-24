@@ -730,16 +730,15 @@ int cpu_exec(CPUArchState *env)
 
 int sim_cpu_exec(void)
 {
-    CPUState *cpu, *next_cpu;
-
     int ret, interrupt_request;
+    CPUState *cpu;
 
-    for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+    CPU_FOREACH(cpu) {
         if (cpu->halted && cpu_has_work(cpu))
             cpu->halted = 0;
     }
 
-    for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+    CPU_FOREACH(cpu) {
         CPUArchState *env = cpu->env_ptr;
 
         /* put eflags in CPU temporary format */
@@ -753,10 +752,9 @@ int sim_cpu_exec(void)
 
     /* prepare setjmp context for exception handling */
     for(;;) {
-        for (cpu = first_cpu; cpu != NULL; cpu = next_cpu) {
+        CPU_FOREACH(cpu) {
             CPUArchState *env = cpu->env_ptr;
             CPUClass *cc = CPU_GET_CLASS(cpu);
-            next_cpu = cpu->next_cpu;
             current_cpu = cpu;
 
             if (sigsetjmp(env->jmp_env, 0) == 0) {
@@ -782,7 +780,7 @@ int sim_cpu_exec(void)
             in_simulation = ptl_simulate();
             unsigned exit_requested = 0;
 
-            for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+            CPU_FOREACH(cpu) {
                 CPUArchState *env = cpu->env_ptr;
                 current_cpu = cpu;
 
@@ -883,7 +881,7 @@ int sim_cpu_exec(void)
 exit_loop:
     exit_request = 0;
 
-    for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+    CPU_FOREACH(cpu) {
         CPUArchState *env = cpu->env_ptr;
 
         /* restore flags in standard format */
