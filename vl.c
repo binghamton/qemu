@@ -263,6 +263,7 @@ uint64_t node_mem[MAX_NODES];
 unsigned long *node_cpumask[MAX_NODES];
 
 uint8_t qemu_uuid[16];
+bool qemu_uuid_set;
 
 static QEMUBootSetHandler *boot_set_handler;
 static void *boot_set_opaque;
@@ -3604,6 +3605,7 @@ int main(int argc, char **argv, char **envp)
                             " Wrong format.\n");
                     exit(1);
                 }
+                qemu_uuid_set = true;
                 break;
 	    case QEMU_OPTION_option_rom:
 		if (nb_option_roms >= MAX_OPTION_ROMS) {
