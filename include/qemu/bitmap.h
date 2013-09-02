@@ -12,6 +12,18 @@
 #ifndef BITMAP_H
 #define BITMAP_H
 
+#define BITMAP_LAST_WORD_MASK(nbits)                                    \
+    (                                                                   \
+        ((nbits) % BITS_PER_LONG) ?                                     \
+        (1UL<<((nbits) % BITS_PER_LONG))-1 : ~0UL                       \
+        )
+
+#define DECLARE_BITMAP(name,bits)                  \
+	unsigned long name[BITS_TO_LONGS(bits)]
+
+#define small_nbits(nbits)                      \
+	((nbits) <= BITS_PER_LONG)
+
 #include "qemu-common.h"
 #include "qemu/bitops.h"
 
@@ -54,18 +66,6 @@
  * find_next_zero_bit(addr, nbits, bit)	Position next zero bit in *addr >= bit
  * find_next_bit(addr, nbits, bit)	Position next set bit in *addr >= bit
  */
-
-#define BITMAP_LAST_WORD_MASK(nbits)                                    \
-    (                                                                   \
-        ((nbits) % BITS_PER_LONG) ?                                     \
-        (1UL<<((nbits) % BITS_PER_LONG))-1 : ~0UL                       \
-        )
-
-#define DECLARE_BITMAP(name,bits)                  \
-	unsigned long name[BITS_TO_LONGS(bits)]
-
-#define small_nbits(nbits)                      \
-	((nbits) <= BITS_PER_LONG)
 
 int slow_bitmap_empty(const unsigned long *bitmap, int bits);
 int slow_bitmap_full(const unsigned long *bitmap, int bits);

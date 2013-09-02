@@ -7,6 +7,16 @@
 #include <string.h>
 #include "fpu/softfloat.h"
 
+#ifdef __cplusplus
+#ifndef UINT32_MAX
+#define UINT32_MAX 0xFFFFFFFFU
+#endif
+
+#ifndef UINT64_MAX
+#define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
+#endif
+#endif
+
 #ifdef CONFIG_MACHINE_BSWAP_H
 # include <sys/endian.h>
 # include <sys/types.h>

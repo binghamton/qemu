@@ -93,6 +93,7 @@ DEF_HELPER_2(outw, void, i32, i32)
 DEF_HELPER_1(inw, tl, i32)
 DEF_HELPER_2(outl, void, i32, i32)
 DEF_HELPER_1(inl, tl, i32)
+DEF_HELPER_1(switch_to_sim, void, env)
 
 DEF_HELPER_3(svm_check_intercept_param, void, env, i32, i64)
 DEF_HELPER_3(vmexit, void, env, i32, i64)

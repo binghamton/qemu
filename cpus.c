@@ -38,6 +38,11 @@
 #include "qemu/main-loop.h"
 #include "qemu/bitmap.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+void sim_cpu_exec();
+#endif
+
 #ifndef _WIN32
 #include "qemu/compatfd.h"
 #endif
@@ -115,9 +120,53 @@ typedef struct TimersState {
     int64_t cpu_clock_offset;
     int32_t cpu_ticks_enabled;
     int64_t dummy;
+#ifdef MARSS_QEMU
+    int64_t cpu_sim_ticks_offset;
+    int64_t cpu_sim_clock_offset;
+#endif
 } TimersState;
 
 static TimersState timers_state;
+
+#ifdef MARSS_QEMU
+#define freq_to_ns(freq) (1e9/freq)
+
+void cpu_set_sim_ticks(void)
+{
+    if (sim_update_clock_offset == 1) {
+        if (timers_state.cpu_ticks_enabled) {
+            timers_state.cpu_sim_ticks_offset = timers_state.cpu_ticks_offset +
+                cpu_get_real_ticks();
+            timers_state.cpu_sim_clock_offset = timers_state.cpu_clock_offset +
+                get_clock();
+        } else {
+            timers_state.cpu_sim_ticks_offset = timers_state.cpu_ticks_offset;
+            timers_state.cpu_sim_clock_offset = timers_state.cpu_clock_offset;
+        }
+        /* Disable offset update until simulation mode set this flag */
+        sim_update_clock_offset = 0;
+    }
+}
+
+int64_t cpu_get_sim_clock(void)
+{
+    int64_t sim_clock_t;
+    sim_clock_t = timers_state.cpu_sim_clock_offset +
+        (int64_t)((float)(sim_cycle) * freq_to_ns(get_sim_cpu_freq()));
+    return sim_clock_t;
+}
+
+/* TODO/FIXME: Move this somewhere else... */
+void qemu_take_screenshot(char *filename)
+{
+#if 0
+    vga_hw_screen_dump(filename);
+#else
+    assert(0 && "FIXME!");
+#endif
+}
+
+#endif
 
 /* Return the virtual CPU time, based on the instruction counter.  */
 int64_t cpu_get_icount(void)
@@ -882,7 +931,26 @@ static void *qemu_tcg_cpu_thread_fn(void *arg)
     }
 
     while (1) {
-        tcg_exec_all();
+        ptl_check_ptlcall_queue();
+
+        if (unlikely(start_simulation)) {
+            CPUState *cpu = first_cpu;
+
+            in_simulation = 1;
+            start_simulation = 0;
+
+            while (cpu != NULL) {
+                CPUState *next_cpu = cpu->next_cpu;
+                tb_flush(cpu->env_ptr);
+                cpu = next_cpu;
+            }
+
+            cpu_set_sim_ticks();
+        }
+
+        in_simulation
+          ? sim_cpu_exec()
+          : tcg_exec_all();
 
         if (use_icount) {
             int64_t deadline = qemu_clock_deadline_ns_all(QEMU_CLOCK_VIRTUAL);

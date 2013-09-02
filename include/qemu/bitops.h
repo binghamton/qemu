@@ -12,9 +12,6 @@
 #ifndef BITOPS_H
 #define BITOPS_H
 
-#include "qemu-common.h"
-#include "host-utils.h"
-
 #define BITS_PER_BYTE           CHAR_BIT
 #define BITS_PER_LONG           (sizeof (unsigned long) * BITS_PER_BYTE)
 
@@ -22,6 +19,9 @@
 #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
 #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+
+#include "qemu-common.h"
+#include "host-utils.h"
 
 /**
  * set_bit - Set a bit in memory

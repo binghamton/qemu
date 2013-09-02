@@ -1458,6 +1458,23 @@ Close the file descriptor previously assigned to @var{fdname} using the
 used by another monitor command.
 ETEXI
 
+#ifdef MARSS_QEMU
+    {
+        .name       = "simconfig",
+        .args_type  = "options:W",
+        .params     = "simulation_options",
+        .help       = "set various simulation options",
+        .user_print = monitor_user_noop,
+        .mhandler.cmd = do_simulate,
+    },
+
+STEXI
+@item simconfig @var{options}
+@findex simconfig
+Specify a MARSS configuration item.
+ETEXI
+#endif
+
     {
         .name       = "block_passwd",
         .args_type  = "device:B,password:s",

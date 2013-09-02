@@ -70,6 +70,11 @@ typedef struct X86CPU {
     bool hyperv_relaxed_timing;
     int hyperv_spinlock_attempts;
 
+    /* TODO/FIXME: Sloppy. */
+#ifdef MARSS_QEMU
+    uint64_t pad[32];
+#endif
+
     /* Features that were filtered out because of missing host capabilities */
     uint32_t filtered_features[FEATURE_WORDS];
 

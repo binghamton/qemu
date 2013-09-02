@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <zlib.h>
+#include "qemu/bitops.h"
 #include "qemu/bitmap.h"
 
 /* Needed early for CONFIG_BSD etc. */
@@ -171,6 +172,10 @@ int main(int argc, char **argv)
 #include "ui/qemu-spice.h"
 #include "qapi/string-input-visitor.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 //#define DEBUG_NET
 //#define DEBUG_SLIRP
 
@@ -207,7 +212,11 @@ CharDriverState *virtcon_hds[MAX_VIRTIO_CONSOLES];
 CharDriverState *sclp_hds[MAX_SCLP_CONSOLES];
 int win2k_install_hack = 0;
 int singlestep = 0;
+#ifndef MARSS_QEMU
 int smp_cpus = 1;
+#else
+int smp_cpus = NUM_SIM_CORES;
+#endif
 int max_cpus = 0;
 int smp_cores = 1;
 int smp_threads = 1;
@@ -3621,10 +3630,15 @@ int main(int argc, char **argv, char **envp)
                 }
                 break;
             case QEMU_OPTION_smp:
+#ifndef MARSS_QEMU
                 if (!qemu_opts_parse(qemu_find_opts("smp-opts"), optarg, 1)) {
                     exit(1);
                 }
                 break;
+#else
+                fprintf(stderr, "Please use MARSS to configure SMP options.\n");
+                break;
+#endif
 	    case QEMU_OPTION_vnc:
 #ifdef CONFIG_VNC
                 display_remote++;
@@ -4398,6 +4412,8 @@ int main(int argc, char **argv, char **envp)
         exit(1);
     }
 
+    ptlsim_init();
+    ptl_qemu_initialized();
     qdev_machine_creation_done();
 
     if (rom_load_all() != 0) {

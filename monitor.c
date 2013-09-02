@@ -84,6 +84,7 @@
  * 'B'          block device name
  * 's'          string (accept optional quote)
  * 'S'          it just appends the rest of the string (accept optional quote)
+ * 'W'          string (including whitespaces)
  * 'O'          option string of the form NAME=VALUE,...
  *              parsed according to QemuOptsList given by its name
  *              Example: 'device:O' uses qemu_device_opts.
@@ -2633,6 +2634,15 @@ int monitor_handle_fd_param(Monitor *mon, const char *fdname)
     return fd;
 }
 
+#ifdef MARSS_QEMU
+static void do_simulate(Monitor *mon, const QDict *qdict)
+{
+  const char *args = qdict_get_str(qdict, "options");
+  monitor_printf(mon, "Simulation options received: %s\n", args);
+  ptl_machine_configure(args);
+}
+#endif
+
 /* Please update hmp-commands.hx when adding or changing commands */
 static mon_cmd_t info_cmds[] = {
     {
@@ -3755,6 +3765,17 @@ static const mon_cmd_t *monitor_parse_command(Monitor *mon,
         c = *typestr;
         typestr++;
         switch(c) {
+#ifdef MARSS_QEMU
+        case 'W':
+            {
+                while(qemu_isspace(*p))
+                    p++;
+                pstrcpy(buf, strlen(p)+1, p);//get_str(buf, sizeof(buf), &p);
+                qdict_put(qdict, key, qstring_from_str(buf));
+                p += strlen(buf);
+            }
+            break;
+#endif
         case 'F':
         case 'B':
         case 's':
@@ -5010,3 +5031,4 @@ QemuOptsList qemu_mon_opts = {
         { /* end of list */ }
     },
 };
+

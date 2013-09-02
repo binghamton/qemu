@@ -23,6 +23,10 @@
 #include "qemu/atomic.h"
 #include "sysemu/qtest.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 bool qemu_cpu_has_work(CPUState *cpu)
 {
     return cpu_has_work(cpu);
@@ -30,6 +34,12 @@ bool qemu_cpu_has_work(CPUState *cpu)
 
 void cpu_loop_exit(CPUArchState *env)
 {
+    if (in_simulation) {
+        env = (CPUArchState *) first_cpu->env_ptr;
+        first_cpu->current_tb = NULL;
+        longjmp(env->jmp_env, 1);
+    }
+
     CPUState *cpu = ENV_GET_CPU(env);
 
     cpu->current_tb = NULL;
@@ -350,10 +360,10 @@ int cpu_exec(CPUArchState *env)
                             do_interrupt_x86_hardirq(env, EXCP12_MCHK, 0);
                             next_tb = 0;
                         } else if ((interrupt_request & CPU_INTERRUPT_HARD) &&
-                                   (((env->hflags2 & HF2_VINTR_MASK) && 
+                                   (((env->hflags2 & HF2_VINTR_MASK) &&
                                      (env->hflags2 & HF2_HIF_MASK)) ||
-                                    (!(env->hflags2 & HF2_VINTR_MASK) && 
-                                     (env->eflags & IF_MASK && 
+                                    (!(env->hflags2 & HF2_VINTR_MASK) &&
+                                     (env->eflags & IF_MASK &&
                                       !(env->hflags & HF_INHIBIT_IRQ_MASK))))) {
                             int intno;
                             cpu_svm_check_intercept_param(env, SVM_EXIT_INTR,
@@ -713,6 +723,201 @@ int cpu_exec(CPUArchState *env)
 #else
 #error unsupported target CPU
 #endif
+
+    /* fail safe : never use current_cpu outside cpu_exec() */
+    current_cpu = NULL;
+    return ret;
+}
+
+int sim_cpu_exec(void)
+{
+    CPUState *cpu, *next_cpu;
+
+    int ret, interrupt_request;
+    int any_cpu_has_work = 0;
+
+    for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+        if (cpu->halted) {
+            if (!cpu_has_work(cpu)) {
+                continue;
+            }
+
+           cpu->halted = 0;
+       }
+
+       else {
+          any_cpu_has_work = 1;
+       }
+    }
+
+    if (!any_cpu_has_work) {
+        return EXCP_HALTED;
+    }
+
+    /* TODO/FIXME: Any CPU? */
+    current_cpu = cpu;
+
+    /* As long as current_cpu is null, up to the assignment just above,
+     * requests by other threads to exit the execution loop are expected to
+     * be issued using the exit_request global. We must make sure that our
+     * evaluation of the global value is performed past the current_cpu
+     * value transition point, which requires a memory barrier as well as
+     * an instruction scheduling constraint on modern architectures.  */
+    smp_mb();
+
+    /* TODO/FIXME: Any CPU? */
+    if (unlikely(exit_request)) {
+        first_cpu->exit_request = 1;
+    }
+
+    for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+        CPUArchState *env = cpu->env_ptr;
+
+        /* put eflags in CPU temporary format */
+        CC_SRC = env->eflags & (CC_O | CC_S | CC_Z | CC_A | CC_P | CC_C);
+        env->df = 1 - (2 * ((env->eflags >> 10) & 1));
+        CC_OP = CC_OP_EFLAGS;
+        env->eflags &= ~(DF_MASK | CC_O | CC_S | CC_Z | CC_A | CC_P | CC_C);
+        env->exception_index = -1;
+        cpu->current_tb = NULL;
+    }
+
+    /* prepare setjmp context for exception handling */
+    for(;;) {
+        for (cpu = first_cpu; cpu != NULL; cpu = next_cpu) {
+            CPUArchState *env = cpu->env_ptr;
+            CPUClass *cc = CPU_GET_CLASS(cpu);
+            next_cpu = cpu->next_cpu;
+            current_cpu = cpu;
+
+            if (sigsetjmp(env->jmp_env, 0) == 0) {
+                /* if an exception is pending, we execute it here */
+                if (env->handle_interrupt && env->exception_index >= 0) {
+                    if (env->exception_index >= EXCP_INTERRUPT) {
+                        /* exit request from the cpu execution loop */
+                        ret = env->exception_index;
+                        if (ret == EXCP_DEBUG) {
+                            cpu_handle_debug_exception(env);
+                        }
+                        goto exit_loop;
+                    } else {
+#if defined(CONFIG_USER_ONLY)
+                       /* if user mode only, we simulate a fake exception
+                           which will be handled outside the cpu execution
+                           loop */
+#if defined(TARGET_I386)
+                        cc->do_interrupt(cpu);
+#endif
+                        ret = env->exception_index;
+                        goto exit_loop;
+#else
+                        cc->do_interrupt(cpu);
+                        env->exception_index = -1;
+#endif
+                    }
+                }
+            }
+        }
+
+        if (setjmp(((CPUArchState*) (first_cpu->env_ptr))->jmp_env) == 0) {
+            in_simulation = ptl_simulate();
+
+            for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+                CPUArchState *env = cpu->env_ptr;
+                current_cpu = cpu;
+
+                interrupt_request = env->handle_interrupt
+                    ? cpu->interrupt_request
+                    : 0;
+
+                if (unlikely(interrupt_request)) {
+                    if (unlikely(cpu->singlestep_enabled & SSTEP_NOIRQ)) {
+                        /* Mask out external interrupts for this step. */
+                        interrupt_request &= ~CPU_INTERRUPT_SSTEP_MASK;
+                    }
+                    if (interrupt_request & CPU_INTERRUPT_DEBUG) {
+                        cpu->interrupt_request &= ~CPU_INTERRUPT_DEBUG;
+                        env->exception_index = EXCP_DEBUG;
+                        cpu_loop_exit(env);
+                    }
+#if !defined(CONFIG_USER_ONLY)
+                    if (interrupt_request & CPU_INTERRUPT_POLL) {
+                        cpu->interrupt_request &= ~CPU_INTERRUPT_POLL;
+                        apic_poll_irq(env->apic_state);
+                    }
+#endif
+                    if (interrupt_request & CPU_INTERRUPT_INIT) {
+                            cpu_svm_check_intercept_param(env, SVM_EXIT_INIT,
+                                                          0);
+                            do_cpu_init(x86_env_get_cpu(env));
+                            env->exception_index = EXCP_HALTED;
+                            cpu_loop_exit(env);
+                    } else if (interrupt_request & CPU_INTERRUPT_SIPI) {
+                            do_cpu_sipi(x86_env_get_cpu(env));
+                    } else if (env->hflags2 & HF2_GIF_MASK) {
+                        if ((interrupt_request & CPU_INTERRUPT_SMI) &&
+                            !(env->hflags & HF_SMM_MASK)) {
+                            cpu_svm_check_intercept_param(env, SVM_EXIT_SMI,
+                                                          0);
+                            cpu->interrupt_request &= ~CPU_INTERRUPT_SMI;
+                            do_smm_enter(x86_env_get_cpu(env));
+                        } else if ((interrupt_request & CPU_INTERRUPT_NMI) &&
+                                   !(env->hflags2 & HF2_NMI_MASK)) {
+                            cpu->interrupt_request &= ~CPU_INTERRUPT_NMI;
+                            env->hflags2 |= HF2_NMI_MASK;
+                            do_interrupt_x86_hardirq(env, EXCP02_NMI, 1);
+                        } else if (interrupt_request & CPU_INTERRUPT_MCE) {
+                            cpu->interrupt_request &= ~CPU_INTERRUPT_MCE;
+                            do_interrupt_x86_hardirq(env, EXCP12_MCHK, 0);
+                        } else if ((interrupt_request & CPU_INTERRUPT_HARD) &&
+                                   (((env->hflags2 & HF2_VINTR_MASK) &&
+                                     (env->hflags2 & HF2_HIF_MASK)) ||
+                                    (!(env->hflags2 & HF2_VINTR_MASK) &&
+                                     (env->eflags & IF_MASK &&
+                                      !(env->hflags & HF_INHIBIT_IRQ_MASK))))) {
+                            int intno;
+                            cpu_svm_check_intercept_param(env, SVM_EXIT_INTR,
+                                                          0);
+                            cpu->interrupt_request &= ~(CPU_INTERRUPT_HARD |
+                                                        CPU_INTERRUPT_VIRQ);
+                            intno = cpu_get_pic_interrupt(env);
+                            qemu_log_mask(CPU_LOG_TB_IN_ASM, "Servicing hardware INT=0x%02x\n", intno);
+                            do_interrupt_x86_hardirq(env, intno, 1);
+                              /* ensure that no TB jump will be modified as
+                               the program flow was changed */
+#if !defined(CONFIG_USER_ONLY)
+                        } else if ((interrupt_request & CPU_INTERRUPT_VIRQ) &&
+                                   (env->eflags & IF_MASK) && 
+                                   !(env->hflags & HF_INHIBIT_IRQ_MASK)) {
+                            int intno;
+                            /* FIXME: this should respect TPR */
+                            cpu_svm_check_intercept_param(env, SVM_EXIT_VINTR,
+                                                          0);
+                            intno = ldl_phys(env->vm_vmcb + offsetof(struct vmcb, control.int_vector));
+                            qemu_log_mask(CPU_LOG_TB_IN_ASM, "Servicing virtual hardware INT=0x%02x\n", intno);
+                            do_interrupt_x86_hardirq(env, intno, 1);
+                            cpu->interrupt_request &= ~CPU_INTERRUPT_VIRQ;
+#endif
+                        }
+                    }
+                }
+                if (unlikely(env->handle_interrupt && cpu->exit_request)) {
+                    cpu->exit_request = 0;
+                    env->exception_index = EXCP_INTERRUPT;
+                    cpu_loop_exit(env);
+                }
+            }
+        }
+    } /* for(;;) */
+
+exit_loop:
+    for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
+        CPUArchState *env = cpu->env_ptr;
+
+        /* restore flags in standard format */
+        env->eflags = env->eflags | cpu_cc_compute_all(env, CC_OP)
+            | (env->df & DF_MASK);
+    }
 
     /* fail safe : never use current_cpu outside cpu_exec() */
     current_cpu = NULL;

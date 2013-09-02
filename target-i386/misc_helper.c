@@ -25,6 +25,10 @@
 #include "exec/softmmu_exec.h"
 #endif /* !defined(CONFIG_USER_ONLY) */
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 /* check if Port I/O is allowed in TSS */
 static inline void check_io(CPUX86State *env, int addr, int size)
 {
@@ -622,4 +626,11 @@ void helper_debug(CPUX86State *env)
 {
     env->exception_index = EXCP_DEBUG;
     cpu_loop_exit(env);
+}
+
+void helper_switch_to_sim(CPUX86State *env) {
+    ptl_machine_configure("-run");
+    tb_flush(env);
+
+    raise_exception(env, EXCP_INTERRUPT);
 }

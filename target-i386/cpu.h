@@ -772,7 +772,13 @@ typedef struct CPUX86State {
     SegmentCache gdt; /* only base and limit are used */
     SegmentCache idt; /* only base and limit are used */
 
+#ifdef MARSS_QEMU
+    target_ulong cr[8];
+    uint8_t handle_interrupt;
+    uint64_t simpoint_decr;
+#else
     target_ulong cr[5]; /* NOTE: cr1 is unused */
+#endif
     int32_t a20_mask;
 
     /* FPU state */
@@ -1129,6 +1135,12 @@ static inline int cpu_mmu_index (CPUX86State *env)
         ((env->hflags & HF_SMAP_MASK) && (env->eflags & AC_MASK))
         ? MMU_KSMAP_IDX : MMU_KERNEL_IDX;
 }
+
+#ifdef MARSS_QEMU
+static inline int cpu_mmu_index_2(CPUX86State *env) {
+    return (env->hflags & HF_CPL_MASK) == 3 ? 1 : 0;
+}
+#endif
 
 #define CC_DST  (env->cc_dst)
 #define CC_SRC  (env->cc_src)

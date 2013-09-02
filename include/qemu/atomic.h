@@ -18,7 +18,9 @@
 /* For C11 atomic ops */
 
 /* Compiler barrier */
+#ifndef barrier
 #define barrier()   ({ asm volatile("" ::: "memory"); (void)0; })
+#endif
 
 #ifndef __ATOMIC_RELAXED
 

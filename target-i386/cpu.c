@@ -48,6 +48,10 @@
 #include "hw/i386/apic_internal.h"
 #endif
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 static void x86_cpu_vendor_words2str(char *dst, uint32_t vendor1,
                                      uint32_t vendor2, uint32_t vendor3)
 {
@@ -1910,6 +1914,9 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
     X86CPU *cpu = x86_env_get_cpu(env);
     CPUState *cs = CPU(cpu);
 
+    if (ptl_cpuid(index, count, eax, ebx, ecx, edx) > 0)
+      return;
+
     /* test if maximum index reached */
     if (index & 0x80000000) {
         if (index > env->cpuid_xlevel) {
@@ -2454,6 +2461,7 @@ static void x86_cpu_initfn(Object *obj)
 {
     CPUState *cs = CPU(obj);
     X86CPU *cpu = X86_CPU(obj);
+
     CPUX86State *env = &cpu->env;
     static int inited;
 
@@ -2496,6 +2504,11 @@ static void x86_cpu_initfn(Object *obj)
 
     cpu->hyperv_spinlock_attempts = HYPERV_SPINLOCK_NEVER_RETRY;
     env->cpuid_apic_id = x86_cpu_apic_id_from_index(cs->cpu_index);
+
+    /* TODO/FIXME: Sloppy. */
+#ifdef MARSS_QEMU
+    ptl_create_new_context(env);
+#endif
 
     /* init various static tables used in TCG mode */
     if (tcg_enabled() && !inited) {

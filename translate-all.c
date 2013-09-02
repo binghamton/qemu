@@ -60,6 +60,10 @@
 #include "translate-all.h"
 #include "qemu/timer.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 //#define DEBUG_TB_INVALIDATE
 //#define DEBUG_FLUSH
 /* make various TB consistency checks */
@@ -710,6 +714,11 @@ void tb_flush(CPUArchState *env1)
     /* XXX: flush processor icache at this point if cache flush is
        expensive */
     tcg_ctx.tb_ctx.tb_flush_count++;
+
+#ifdef MARSS_QEMU
+    if (in_simulation)
+        ptl_flush_bbcache(-1);
+#endif
 }
 
 #ifdef DEBUG_TB_CHECK

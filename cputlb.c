@@ -27,6 +27,10 @@
 
 #include "exec/memory-internal.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 //#define DEBUG_TLB
 //#define DEBUG_TLB_CHECK
 
@@ -77,6 +81,11 @@ void tlb_flush(CPUArchState *env, int flush_global)
     env->tlb_flush_addr = -1;
     env->tlb_flush_mask = 0;
     tlb_flush_count++;
+
+#ifdef MARSS_QEMU
+    if (in_simulation)
+        ptl_flush_bbcache(ENV_GET_CPU(env)->cpu_index);
+#endif
 }
 
 static inline void tlb_flush_entry(CPUTLBEntry *tlb_entry, target_ulong addr)
@@ -292,6 +301,11 @@ void tlb_set_page(CPUArchState *env, target_ulong vaddr,
     code_address = address;
     iotlb = memory_region_section_get_iotlb(env, section, vaddr, paddr, xlat,
                                             prot, &address);
+
+#ifdef MARSS_QEMU
+    ptl_add_phys_memory_mapping(ENV_GET_CPU(env)->cpu_index,
+        addend & TARGET_PAGE_MASK, paddr & TARGET_PAGE_MASK);
+#endif
 
     index = (vaddr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
     env->iotlb[mmu_idx][index] = iotlb - vaddr;

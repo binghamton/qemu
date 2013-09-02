@@ -41,6 +41,10 @@
 #include <sys/prctl.h>
 #endif
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 /***********************************************************/
 /* timers */
 
@@ -451,6 +455,11 @@ int64_t qemu_clock_get_ns(QEMUClockType type)
         return get_clock();
     default:
     case QEMU_CLOCK_VIRTUAL:
+#ifdef MARSS_QEMU
+        if (in_simulation) {
+            return cpu_get_sim_clock();
+        } else
+#endif
         if (use_icount) {
             return cpu_get_icount();
         } else {

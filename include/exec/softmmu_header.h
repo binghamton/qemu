@@ -54,12 +54,20 @@
 
 #elif ACCESS_TYPE == (NB_MMU_MODES)
 
+#ifdef MARSS_QEMU
+#define CPU_MMU_INDEX (cpu_mmu_index_2(env))
+#else
 #define CPU_MMU_INDEX (cpu_mmu_index(env))
+#endif
 #define MMUSUFFIX _mmu
 
 #elif ACCESS_TYPE == (NB_MMU_MODES + 1)
 
+#ifdef MARSS_QEMU
+#define CPU_MMU_INDEX (env->hflags & HF_CPL_MASK) == 3 ? 1 : 0
+#else
 #define CPU_MMU_INDEX (cpu_mmu_index(env))
+#endif
 #define MMUSUFFIX _cmmu
 
 #else
