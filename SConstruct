@@ -467,7 +467,6 @@ if env['kvm']:
     obj_files += " hw/i386/kvmvapic.c"
     obj_files += " hw/i386/kvm/clock.c hw/i386/kvm/apic.c hw/i386/kvm/i8259.c"
     obj_files += " hw/i386/kvm/ioapic.c hw/i386/kvm/i8254.c"
-    obj_files += " %s/hyperv.c" % target_path
 else:
     obj_files += " kvm-stub.c"
 
