@@ -567,7 +567,7 @@ qmp_commands_old_h = env.HXTOOL(
 # qapi and qga
 qapi_type_bld = "python %s/scripts/qapi-types.py -o %s < $SOURCE " % (
         env['source_path'], env['source_path'])
-qapi_visit_bld = "python %s/scripts/qapi-visit.py -o %s < $SOURCE " % (
+qapi_visit_bld = "python %s/scripts/qapi-visit.py -b -o %s < $SOURCE " % (
         env['source_path'], env['source_path'])
 qapi_command_bld = "python %s/scripts/qapi-commands.py -m -o %s < $SOURCE " % (
         env['source_path'], env['source_path'])
