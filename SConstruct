@@ -314,16 +314,25 @@ env['BUILDERS']['HXTOOL'] = Builder(action = Action(hxtool_bld,
 ##########################
 # trace
 
-trace_h_bld = "%s/scripts/tracetool.py --backend=nop --format=h < $SOURCE > $TARGET " % env['source_path']
-trace_c_bld = "%s/scripts/tracetool.py --backend=nop --format=c < $SOURCE > $TARGET " % env['source_path']
+trace_h_bld = "%s/scripts/tracetool.py --backend=nop --format=events-h < $SOURCE > $TARGET " % env['source_path']
+trace_c_bld = "%s/scripts/tracetool.py --backend=nop --format=events-c < $SOURCE > $TARGET " % env['source_path']
+trace2_h_bld = "%s/scripts/tracetool.py --backend=nop --format=h < $SOURCE > $TARGET " % env['source_path']
+trace2_c_bld = "%s/scripts/tracetool.py --backend=nop --format=c < $SOURCE > $TARGET " % env['source_path']
 
 env['BUILDERS']['TRACE_H_CR'] = Builder(action = Action(trace_h_bld,
     cmdstr="$CREATECOMSTR"))
 env['BUILDERS']['TRACE_C_CR'] = Builder(action = Action(trace_c_bld,
     cmdstr="$CREATECOMSTR"))
+env['BUILDERS']['TRACE2_H_CR'] = Builder(action = Action(trace2_h_bld,
+    cmdstr="$CREATECOMSTR"))
+env['BUILDERS']['TRACE2_C_CR'] = Builder(action = Action(trace2_c_bld,
+    cmdstr="$CREATECOMSTR"))
 
-trace_h = env.TRACE_H_CR('trace.h', 'trace-events')
-trace_c = env.TRACE_C_CR('trace.c', 'trace-events')
+
+trace_h = env.TRACE_H_CR('trace/generated-events.h', 'trace-events')
+trace_c = env.TRACE_C_CR('trace/generated-events.c', 'trace-events')
+trace2_h = env.TRACE2_H_CR('trace/generated-tracers.h', 'trace-events')
+trace2_c = env.TRACE2_C_CR('trace/generated-tracers.c', 'trace-events')
 
 trace_files = ""
 
@@ -341,7 +350,8 @@ if env['trace_backend'] == 'stderr':
     trace_files += "trace/stderr.c "
 
 trace_files += "trace/control.c "
-trace_files += "trace/generated-events.c "
+
+env.Depends(['config-host.h'], [trace_h, trace2_h])
 
 #######################
 # qemu-img :
@@ -358,6 +368,7 @@ qemu_tool_o = comm_lib_env.Object(Split(tool_files))
 
 if env['trace_backend'] != 'dtrace':
     qemu_tool_o += comm_lib_env.Object(trace_c)
+    qemu_tool_o += comm_lib_env.Object(trace2_c)
 
 qemu_err_o = comm_lib_env.Object("util/qemu-error.c")
 qemu_timer_comm_o = comm_lib_env.Object("util/qemu-timer-common.c")
