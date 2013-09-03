@@ -904,13 +904,14 @@ int sim_cpu_exec(void)
                 if (unlikely(env->handle_interrupt && cpu->exit_request)) {
                     cpu->exit_request = 0;
                     env->exception_index = EXCP_INTERRUPT;
-                    cpu_loop_exit(env);
                 }
             }
         }
     } /* for(;;) */
 
 exit_loop:
+    exit_request = in_simulation ? 0 : 1;
+
     for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
         CPUArchState *env = cpu->env_ptr;
 
