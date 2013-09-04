@@ -188,6 +188,9 @@ int64_t cpu_get_icount(void)
 /* return the host CPU cycle counter and handle stop/restart */
 int64_t cpu_get_ticks(void)
 {
+    if (in_simulation) {
+        return timers_state.cpu_sim_ticks_offset + sim_cycle;
+    }
     if (use_icount) {
         return cpu_get_icount();
     }
