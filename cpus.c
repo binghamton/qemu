@@ -934,27 +934,11 @@ static void *qemu_tcg_cpu_thread_fn(void *arg)
     }
 
     while (1) {
-        ptl_check_ptlcall_queue();
-
-        if (unlikely(start_simulation)) {
-            CPUState *cpu = first_cpu;
-
-            in_simulation = 1;
-            start_simulation = 0;
-
-            while (cpu != NULL) {
-                CPUState *next_cpu = cpu->next_cpu;
-                tb_flush(cpu->env_ptr);
-                cpu = next_cpu;
-            }
-
-            cpu_set_sim_ticks();
-        }
-
         in_simulation
           ? sim_cpu_exec()
           : tcg_exec_all();
 
+#ifndef MARSS_QEMU
         if (use_icount) {
             int64_t deadline = qemu_clock_deadline_ns_all(QEMU_CLOCK_VIRTUAL);
 
@@ -962,6 +946,7 @@ static void *qemu_tcg_cpu_thread_fn(void *arg)
                 qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
             }
         }
+#endif
         qemu_tcg_wait_io_event();
     }
 
@@ -1118,7 +1103,9 @@ void cpu_resume(CPUState *cpu)
 void resume_all_vcpus(void)
 {
     CPUState *cpu = first_cpu;
-
+#ifdef MARSS_QEMU
+    if (!in_simulation)
+#endif
     qemu_clock_enable(QEMU_CLOCK_VIRTUAL, true);
     while (cpu) {
         cpu_resume(cpu);

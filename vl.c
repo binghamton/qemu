@@ -4198,6 +4198,10 @@ int main(int argc, char **argv, char **envp)
     }
     configure_icount(icount_option);
 
+#ifdef MARSS_QEMU
+    use_icount = 0;
+#endif
+
     /* clean up network at qemu process termination */
     atexit(&net_cleanup);
 

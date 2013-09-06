@@ -53,7 +53,6 @@ void cpu_loop_exit(CPUArchState *env)
 void cpu_resume_from_signal(CPUArchState *env, void *puc)
 {
     /* XXX: restore cpu registers saved in host registers */
-
     env->exception_index = -1;
     siglongjmp(env->jmp_env, 1);
 }
@@ -734,40 +733,10 @@ int sim_cpu_exec(void)
     CPUState *cpu, *next_cpu;
 
     int ret, interrupt_request;
-    int any_cpu_has_work = 0;
 
     for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
-        if (cpu->halted) {
-            if (!cpu_has_work(cpu)) {
-                continue;
-            }
-
-           cpu->halted = 0;
-       }
-
-       else {
-          any_cpu_has_work = 1;
-       }
-    }
-
-    if (!any_cpu_has_work) {
-        return EXCP_HALTED;
-    }
-
-    /* TODO/FIXME: Any CPU? */
-    current_cpu = cpu;
-
-    /* As long as current_cpu is null, up to the assignment just above,
-     * requests by other threads to exit the execution loop are expected to
-     * be issued using the exit_request global. We must make sure that our
-     * evaluation of the global value is performed past the current_cpu
-     * value transition point, which requires a memory barrier as well as
-     * an instruction scheduling constraint on modern architectures.  */
-    smp_mb();
-
-    /* TODO/FIXME: Any CPU? */
-    if (unlikely(exit_request)) {
-        first_cpu->exit_request = 1;
+        if (cpu->halted && cpu_has_work(cpu))
+            cpu->halted = 0;
     }
 
     for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
@@ -801,26 +770,17 @@ int sim_cpu_exec(void)
                         }
                         goto exit_loop;
                     } else {
-#if defined(CONFIG_USER_ONLY)
-                       /* if user mode only, we simulate a fake exception
-                           which will be handled outside the cpu execution
-                           loop */
-#if defined(TARGET_I386)
-                        cc->do_interrupt(cpu);
-#endif
-                        ret = env->exception_index;
-                        goto exit_loop;
-#else
                         cc->do_interrupt(cpu);
                         env->exception_index = -1;
-#endif
                     }
                 }
             }
         }
 
         if (setjmp(((CPUArchState*) (first_cpu->env_ptr))->jmp_env) == 0) {
+            current_cpu = first_cpu;
             in_simulation = ptl_simulate();
+            unsigned exit_requested = 0;
 
             for (cpu = first_cpu; cpu != NULL; cpu = cpu->next_cpu) {
                 CPUArchState *env = cpu->env_ptr;
@@ -838,7 +798,7 @@ int sim_cpu_exec(void)
                     if (interrupt_request & CPU_INTERRUPT_DEBUG) {
                         cpu->interrupt_request &= ~CPU_INTERRUPT_DEBUG;
                         env->exception_index = EXCP_DEBUG;
-                        cpu_loop_exit(env);
+                        exit_requested = 1;
                     }
 #if !defined(CONFIG_USER_ONLY)
                     if (interrupt_request & CPU_INTERRUPT_POLL) {
@@ -851,7 +811,7 @@ int sim_cpu_exec(void)
                                                           0);
                             do_cpu_init(x86_env_get_cpu(env));
                             env->exception_index = EXCP_HALTED;
-                            cpu_loop_exit(env);
+                            exit_requested = 1;
                     } else if (interrupt_request & CPU_INTERRUPT_SIPI) {
                             do_cpu_sipi(x86_env_get_cpu(env));
                     } else if (env->hflags2 & HF2_GIF_MASK) {
@@ -904,11 +864,19 @@ int sim_cpu_exec(void)
                 if (unlikely(env->handle_interrupt && cpu->exit_request)) {
                     cpu->exit_request = 0;
                     env->exception_index = EXCP_INTERRUPT;
+                    exit_requested = 1;
                 }
             }
 
-            if (!in_simulation)
-                goto exit_loop;
+            if (exit_requested) {
+                ret = EXCP_INTERRUPT;
+                break;
+            }
+        }
+
+        if (!in_simulation) {
+            ret = EXCP_INTERRUPT;
+            goto exit_loop;
         }
     } /* for(;;) */
 

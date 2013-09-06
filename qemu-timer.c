@@ -146,6 +146,9 @@ void qemu_clock_notify(QEMUClockType type)
 
 void qemu_clock_enable(QEMUClockType type, bool enabled)
 {
+    if (in_simulation)
+        return;
+
     QEMUClock *clock = qemu_clock_ptr(type);
     bool old = clock->enabled;
     clock->enabled = enabled;
