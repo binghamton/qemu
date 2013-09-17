@@ -3638,6 +3638,9 @@ int main(int argc, char **argv, char **envp)
 #else
                 fprintf(stderr, "Please use MARSS to configure SMP options.\n");
                 break;
+            case QEMU_OPTION_simconfig:
+                ptl_config_from_file(optarg);
+                break;
 #endif
 	    case QEMU_OPTION_vnc:
 #ifdef CONFIG_VNC

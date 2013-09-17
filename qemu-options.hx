@@ -94,6 +94,13 @@ given, the total number of CPUs @var{n} can be omitted. @var{maxcpus}
 specifies the maximum number of hotpluggable CPUs.
 ETEXI
 
+#ifdef MARSS_QEMU
+
+DEF("simconfig", HAS_ARG, QEMU_OPTION_simconfig,
+    "-simconfig config.file", QEMU_ARCH_ALL)
+
+#endif
+
 DEF("numa", HAS_ARG, QEMU_OPTION_numa,
     "-numa node[,mem=size][,cpus=cpu[-cpu]][,nodeid=node]\n", QEMU_ARCH_ALL)
 STEXI
