@@ -17,12 +17,16 @@ if target_base_arch == "x86_64":
 
 target_path = "%s/target-%s" % (env['source_path'], target_base_arch)
 target_build_path = "%s/%s-softmmu" % (env['source_path'], target['arch'])
+
 env['CPPPATH'].append("%s/include" % env['source_path'])
 env['CPPPATH'].append([".", "..", target_path, env['source_path']])
 env['CPPPATH'].append(target['dir'])
 env['CPPPATH'].append(ptlsim_inc_dir)
 env['CPPPATH'].append("%s/linux-headers" % env['source_path'])
 env['CPPPATH'].append("/usr/include/pixman-1")
+
+env.ParseConfig('pkg-config --cflags --libs libusb-1.0')
+
 env.Append(CCFLAGS = "-MMD -MP -DNEED_CPU_H".split())
 env.Append(CCFLAGS = '-DMARSS_QEMU ')
 env.Append(CCFLAGS = '-DTARGET_NAME=\\\"i386\\\"')
@@ -100,7 +104,7 @@ env.Append(LIBS = "aio")
 # QObject
 q_object_files = "qobject/qint.c qobject/qstring.c qobject/qdict.c qobject/qlist.c qobject/qfloat.c qobject/qbool.c "
 q_object_files += " qobject/qjson.c qobject/json-lexer.c qobject/json-streamer.c qobject/json-parser.c util/qemu-openpty.c "
-q_object_files += " qobject/qerror.c util/error.c util/fifo8.c util/hbitmap.c thread-pool.c util/uri.c "
+q_object_files += " qobject/qerror.c util/error.c util/fifo8.c util/hbitmap.c thread-pool.c util/uri.c util/throttle.c "
 
 #######################
 # qom
@@ -190,8 +194,9 @@ comm_hw_files += " usb/core.c "
 comm_hw_files += " usb/dev-hub.c usb/dev-hid.c usb/desc.c "
 comm_hw_files += " usb/dev-wacom.c usb/dev-serial.c "
 comm_hw_files += " usb/dev-network.c usb/bus.c usb/dev-audio.c "
-comm_hw_files += " usb/host-%s.c" % env['usb']
-comm_hw_files += " usb/dev-bluetooth.c"
+comm_hw_files += " usb/host-%s.c" % 'libusb'
+comm_hw_files += " usb/dev-bluetooth.c "
+comm_hw_files += " usb/combined-packet.c "
 
 comm_libs = ""
 comm_ldflags = ""

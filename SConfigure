@@ -1133,8 +1133,12 @@ if conf.CheckCHeader('machine/bswap.h'):
 
 if env['coroutine'] == "ucontext":
     config_mak.write("CONFIG_UCONTEXT_COROUTINE=y\n")
+    config_mak.write("CONFIG_COROUTINE_POOL=y\n")
 elif env['coroutine'] == "sigaltstack":
     config_mak.write("CONFIG_SIGALTSTACK_COROUTINE=y\n")
+    config_mak.write("CONFIG_COROUTINE_POOL=y\n")
+else:
+    config_mak.write("CONFIG_COROUTINE_POOL=n\n")
 
 if env['slirp'] == True:
     config_mak.write("CONFIG_SMBD_COMMAND=\"%s\"\n" % env['smbd'])
