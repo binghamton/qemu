@@ -68,6 +68,13 @@ call("sh %s/scripts/make_device_config.sh %s %s" % (env['source_path'],
 # FIXME later - if config-devices.mak already exitsts then rename it..
 call("mv %s.tmp %s" % (target_mak_file, target_mak_file), shell=True)
 
+# TODO: Hack.
+call("cp hw/i386/ssdt-misc.hex.generated hw/i386/ssdt-misc.hex", shell=True)
+call("cp hw/i386/q35-acpi-dsdt.hex.generated hw/i386/q35-acpi-dsdt.hex", shell=True)
+call("cp hw/i386/acpi-dsdt.hex.generated hw/i386/acpi-dsdt.hex", shell=True)
+call("cp hw/i386/ssdt-pcihp.hex.generated hw/i386/ssdt-pcihp.hex", shell=True)
+call("cp hw/i386/ssdt-proc.hex.generated hw/i386/ssdt-proc.hex", shell=True)
+
 # Now read in the file and set env variables
 t_mak = open(target_mak_file, 'r')
 for line in t_mak.readlines():
@@ -525,8 +532,10 @@ hw_files += " net/eepro100.c net/ne2000.c net/pcnet-pci.c net/pcnet.c net/rtl813
 # hw_files += " msmouse.c"
 
 if target_base_arch == "i386":
+    hw_files += " isa/lpc_ich9.c i386/bios-linker-loader.c acpi/ich9.c "
+
     hw_files += " input/pckbd.c display/vga.c display/vga-isa.c display/vga-pci.c intc/ioapic.c"
-    hw_files += " block/fdc.c timer/mc146818rtc.c char/serial.c intc/i8259.c timer/i8254.c acpi/piix4.c "
+    hw_files += " block/fdc.c timer/mc146818rtc.c char/serial.c intc/i8259.c timer/i8254.c acpi/piix4.c i386/acpi-build.c "
     hw_files += " audio/pcspk.c i386/pc.c display/cirrus_vga.c intc/apic.c char/parallel.c acpi/core.c i386/smbios.c"
     hw_files += " input/vmmouse.c misc/vmport.c net/ne2000-isa.c dma/i8257.c misc/pvpanic.c "
     hw_files += " display/vmware_vga.c timer/hpet.c char/serial-isa.c "
