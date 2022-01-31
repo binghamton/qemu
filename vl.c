@@ -154,6 +154,10 @@ int main(int argc, char **argv)
 
 #include "disas.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 #include "qemu_socket.h"
 
 #include "slirp/libslirp.h"
@@ -204,7 +208,11 @@ int win2k_install_hack = 0;
 int rtc_td_hack = 0;
 int usb_enabled = 0;
 int singlestep = 0;
+#ifdef MARSS_QEMU
+int smp_cpus = NUM_SIM_CORES;
+#else
 int smp_cpus = 1;
+#endif
 int max_cpus = 0;
 int smp_cores = 1;
 int smp_threads = 1;
@@ -857,6 +865,7 @@ static void numa_add(const char *optarg)
     return;
 }
 
+#ifndef MARSS_QEMU
 static void smp_parse(const char *optarg)
 {
     int smp, sockets = 0, threads = 0, cores = 0;
@@ -900,6 +909,7 @@ static void smp_parse(const char *optarg)
     if (max_cpus == 0)
         max_cpus = smp_cpus;
 }
+#endif // MARSS_QEMU
 
 /***********************************************************/
 /* USB devices */
@@ -1403,6 +1413,10 @@ static int vm_can_run(void)
 
 qemu_irq qemu_system_powerdown;
 
+#ifdef MARSS_QEMU
+void tb_flush(CPUState *);
+#endif
+
 static void main_loop(void)
 {
     int r;
@@ -1412,11 +1426,35 @@ static void main_loop(void)
     for (;;) {
         do {
             bool nonblocking = false;
+#ifdef MARSS_QEMU
+            ptl_check_ptlcall_queue();
+
+            if (start_simulation) {
+                cpu_set_sim_ticks();
+                in_simulation = 1;
+                start_simulation = 0;
+                tb_flush(first_cpu);
+
+                if (!vm_running)
+                    vm_start();
+            }
+
+#endif
 #ifdef CONFIG_PROFILER
             int64_t ti;
 #endif
 #ifndef CONFIG_IOTHREAD
+#ifdef MARSS_QEMU
+            if(in_simulation && !qemu_alarm_pending()) {
+                /* cur_cpu = first_cpu; */
+                sim_cpu_exec();
+                nonblocking = true;
+            } else {
+#endif
             nonblocking = cpu_exec_all();
+#ifdef MARSS_QEMU
+            }
+#endif
 #endif
 #ifdef CONFIG_PROFILER
             ti = profile_getclock();
@@ -2558,6 +2596,7 @@ int main(int argc, char **argv, char **envp)
                     exit(1);
                 }
                 break;
+#ifndef MARSS_QEMU
             case QEMU_OPTION_smp:
                 smp_parse(optarg);
                 if (smp_cpus < 1) {
@@ -2574,6 +2613,7 @@ int main(int argc, char **argv, char **envp)
                     exit(1);
                 }
                 break;
+#endif
 	    case QEMU_OPTION_vnc:
                 display_remote++;
 		vnc_display = optarg;
@@ -2753,6 +2793,13 @@ int main(int argc, char **argv, char **envp)
                     fclose(fp);
                     break;
                 }
+#ifdef MARSS_QEMU
+            case QEMU_OPTION_simconfig:
+                {
+                    ptl_config_from_file(optarg);
+                    break;
+                }
+#endif
             default:
                 os_parse_cmd_args(popt->index, optarg);
             }
@@ -3121,6 +3168,10 @@ int main(int argc, char **argv, char **envp)
             autostart = 0;
         }
     }
+
+#ifdef MARSS_QEMU
+    ptl_qemu_initialized();
+#endif
 
     if (incoming) {
         int ret = qemu_start_incoming_migration(incoming);

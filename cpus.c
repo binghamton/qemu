@@ -48,6 +48,10 @@
 #define PR_MCE_KILL 33
 #endif
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 static CPUState *next_cpu;
 
 /***********************************************************/
@@ -925,9 +929,27 @@ bool cpu_exec_all(void)
                 break;
             }
         } else if (env->stop) {
+#ifdef MARSS_QEMU
+			continue; /* Let other CPUS execute */
+#else
             break;
+#endif
         }
+
+#ifdef MARSS_QEMU
+        if (in_simulation)
+          /* No need to run for other cpus */
+            break;
+#endif
+
+        }
+#ifdef MARSS_QEMU
+	if (!any_cpu_has_work()) {
+		/* All CPUs are paused, call ptl_simpoint reached
+		 * to check if we need to switch to simulation or not */
+		ptl_simpoint_reached(0);
     }
+#endif
     exit_request = 0;
     return any_cpu_has_work();
 }

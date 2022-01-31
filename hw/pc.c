@@ -42,6 +42,12 @@
 #include "blockdev.h"
 #include "ui/qemu-spice.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+
+// For sanity checking of addresses
+uint64_t qemu_ram_size;
+#endif
 /* output Bochs bios info messages */
 //#define DEBUG_BIOS
 
@@ -959,6 +965,10 @@ void pc_memory_init(ram_addr_t ram_size,
     int bios_size, isa_bios_size;
     void *fw_cfg;
 
+#ifdef MARSS_QEMU
+    qemu_ram_size = (uint64_t)ram_size;
+#endif
+
     if (ram_size >= 0xe0000000 ) {
         above_4g_mem_size = ram_size - 0xe0000000;
         below_4g_mem_size = 0xe0000000;
@@ -1134,6 +1144,10 @@ void pc_basic_device_init(qemu_irq *isa_irq,
 
     cpu_exit_irq = qemu_allocate_irqs(cpu_request_exit, NULL, 1);
     DMA_init(0, cpu_exit_irq);
+
+#ifdef MARSS_QEMU
+    ptlsim_init();
+#endif
 
     for(i = 0; i < MAX_FD; i++) {
         fd[i] = drive_get(IF_FLOPPY, 0, i);

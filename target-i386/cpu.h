@@ -633,7 +633,13 @@ typedef struct CPUX86State {
     SegmentCache gdt; /* only base and limit are used */
     SegmentCache idt; /* only base and limit are used */
 
+#ifdef MARSS_QEMU
+    target_ulong cr[8]; /* NOTE: cr1 is unused */
+    uint8_t handle_interrupt; /* Simulater managed int enable flag */
+    uint64_t simpoint_decr;
+#else
     target_ulong cr[5]; /* NOTE: cr1 is unused */
+#endif
     int32_t a20_mask;
 
     /* FPU state */
@@ -949,6 +955,14 @@ static inline int cpu_mmu_index (CPUState *env)
     return (env->hflags & HF_CPL_MASK) == 3 ? 1 : 0;
 }
 
+#ifdef MARSS_QEMU
+static inline int cpu_mmu_index_2(target_ulong env_ptr)
+{
+  CPUState *env = (CPUState*)env_ptr;
+  return (env->hflags & HF_CPL_MASK) == 3 ? 1 : 0;
+}
+#endif
+
 /* translate.c */
 void optimize_flags_init(void);
 
@@ -984,4 +998,9 @@ static inline void cpu_get_tb_cpu_state(CPUState *env, target_ulong *pc,
 
 void do_cpu_init(CPUState *env);
 void do_cpu_sipi(CPUState *env);
+
+#ifdef MARSS_QEMU
+void set_cpu_env(CPUState* env1);
+int sim_cpu_exec(void);
+#endif
 #endif /* CPU_I386_H */

@@ -1214,6 +1214,17 @@ STEXI
 Set the encrypted device @var{device} password to @var{password}
 ETEXI
 
+#ifdef MARSS_QEMU
+    {
+        .name       = "simconfig",
+        .args_type  = "options:W",
+        .params     = "simulation_options",
+        .help       = "set various simulation options",
+        .user_print = monitor_user_noop,
+        .mhandler.cmd = do_simulate,
+    },
+#endif
+
     {
         .name       = "set_password",
         .args_type  = "protocol:s,password:s,connected:s?",

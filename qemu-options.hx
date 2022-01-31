@@ -43,6 +43,7 @@ STEXI
 Select CPU model (-cpu ? for list and additional feature selection)
 ETEXI
 
+#ifndef MARSS_QEMU
 DEF("smp", HAS_ARG, QEMU_OPTION_smp,
     "-smp n[,maxcpus=cpus][,cores=cores][,threads=threads][,sockets=sockets]\n"
     "                set the number of CPUs to 'n' [default=1]\n"
@@ -64,6 +65,13 @@ specified. Missing values will be computed. If any on the three values is
 given, the total number of CPUs @var{n} can be omitted. @var{maxcpus}
 specifies the maximum number of hotpluggable CPUs.
 ETEXI
+
+#else
+
+DEF("simconfig", HAS_ARG, QEMU_OPTION_simconfig,
+    "-simconfig config.file", QEMU_ARCH_ALL)
+
+#endif
 
 DEF("numa", HAS_ARG, QEMU_OPTION_numa,
     "-numa node[,mem=size][,cpus=cpu[-cpu]][,nodeid=node]\n", QEMU_ARCH_ALL)

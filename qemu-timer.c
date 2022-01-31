@@ -55,6 +55,10 @@
 
 #include "qemu-timer.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 /* Conversion factor from emulated instructions to virtual clock ticks.  */
 int icount_time_shift;
 /* Arbitrarily pick 1MIPS as the minimum allowable speed.  */
@@ -73,6 +77,10 @@ typedef struct TimersState {
     int64_t cpu_clock_offset;
     int32_t cpu_ticks_enabled;
     int64_t dummy;
+#ifdef MARSS_QEMU
+    int64_t cpu_sim_ticks_offset;
+    int64_t cpu_sim_clock_offset;
+#endif
 } TimersState;
 
 TimersState timers_state;
@@ -80,6 +88,11 @@ TimersState timers_state;
 /* return the host CPU cycle counter and handle stop/restart */
 int64_t cpu_get_ticks(void)
 {
+#ifdef MARSS_QEMU
+    if(in_simulation) {
+        return timers_state.cpu_sim_ticks_offset + sim_cycle;
+    }
+#endif
     if (use_icount) {
         return cpu_get_icount();
     }
@@ -145,6 +158,40 @@ void cpu_disable_ticks(void)
     }
 }
 
+#ifdef MARSS_QEMU
+#define freq_to_ns(freq) (1e9/freq)
+
+void cpu_set_sim_ticks(void)
+{
+    if (sim_update_clock_offset == 1) {
+        if (timers_state.cpu_ticks_enabled) {
+            timers_state.cpu_sim_ticks_offset = timers_state.cpu_ticks_offset +
+                cpu_get_real_ticks();
+            timers_state.cpu_sim_clock_offset = timers_state.cpu_clock_offset +
+                get_clock();
+        } else {
+            timers_state.cpu_sim_ticks_offset = timers_state.cpu_ticks_offset;
+            timers_state.cpu_sim_clock_offset = timers_state.cpu_clock_offset;
+        }
+        /* Disable offset update until simulation mode set this flag */
+        sim_update_clock_offset = 0;
+    }
+}
+
+static int64_t cpu_get_sim_clock(void)
+{
+    int64_t sim_clock_t;
+    sim_clock_t = timers_state.cpu_sim_clock_offset +
+        (int64_t)((float)(sim_cycle) * freq_to_ns(get_sim_cpu_freq()));
+    return sim_clock_t;
+}
+
+void qemu_take_screenshot(char *filename)
+{
+    vga_hw_screen_dump(filename);
+}
+#endif
+
 /***********************************************************/
 /* timers */
 
@@ -199,6 +246,10 @@ static void qemu_rearm_alarm_timer(struct qemu_alarm_timer *t)
 
 /* TODO: MIN_TIMER_REARM_NS should be optimized */
 #define MIN_TIMER_REARM_NS 250000
+
+#ifdef MARSS_QEMU
+#define SIM_MIN_TIMER_REARM_NS (MIN_TIMER_REARM_NS * 4)
+#endif
 
 #ifdef _WIN32
 
@@ -511,6 +562,11 @@ int64_t qemu_get_clock(QEMUClock *clock)
         return get_clock() / 1000000;
     default:
     case QEMU_CLOCK_VIRTUAL:
+#ifdef MARSS_QEMU
+        if (in_simulation) {
+            return cpu_get_sim_clock();
+        }
+#endif
         if (use_icount) {
             return cpu_get_icount();
         } else {
@@ -896,6 +952,11 @@ static void dynticks_rearm_timer(struct qemu_alarm_timer *t)
     nearest_delta_ns = qemu_next_alarm_deadline();
     if (nearest_delta_ns < MIN_TIMER_REARM_NS)
         nearest_delta_ns = MIN_TIMER_REARM_NS;
+
+#ifdef MARSS_QEMU
+	if (in_simulation && nearest_delta_ns < SIM_MIN_TIMER_REARM_NS)
+		nearest_delta_ns = SIM_MIN_TIMER_REARM_NS;
+#endif
 
     /* check whether a timer is already running */
     if (timer_gettime(host_timer, &timeout)) {

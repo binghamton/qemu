@@ -51,6 +51,11 @@
 #include <libutil.h>
 #endif
 #endif
+
+#endif
+
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
 #endif
 
 //#define DEBUG_TB_INVALIDATE
@@ -437,7 +442,9 @@ static inline PhysPageDesc *phys_page_find(target_phys_addr_t index)
     return phys_page_find_alloc(index, 0);
 }
 
+#ifndef MARSS_QEMU
 static void tlb_protect_code(ram_addr_t ram_addr);
+#endif
 static void tlb_unprotect_code_phys(CPUState *env, ram_addr_t ram_addr,
                                     target_ulong vaddr);
 #define mmap_lock() do { } while(0)
@@ -716,6 +723,11 @@ void tb_flush(CPUState *env1)
     /* XXX: flush processor icache at this point if cache flush is
        expensive */
     tb_flush_count++;
+
+#ifdef MARSS_QEMU
+    if(in_simulation)
+        ptl_flush_bbcache(-1);
+#endif
 }
 
 #ifdef DEBUG_TB_CHECK
@@ -1946,6 +1958,11 @@ void tlb_flush(CPUState *env, int flush_global)
 
     env->tlb_flush_addr = -1;
     env->tlb_flush_mask = 0;
+
+#ifdef MARSS_QEMU
+    if(in_simulation)
+        ptl_flush_bbcache(env->cpu_index);
+#endif
     tlb_flush_count++;
 }
 
@@ -1993,7 +2010,10 @@ void tlb_flush_page(CPUState *env, target_ulong addr)
 
 /* update the TLBs so that writes to code in the virtual page 'addr'
    can be detected */
-static void tlb_protect_code(ram_addr_t ram_addr)
+#ifndef MARSS_QEMU
+static
+#endif
+void tlb_protect_code(ram_addr_t ram_addr)
 {
     cpu_physical_memory_reset_dirty(ram_addr,
                                     ram_addr + TARGET_PAGE_SIZE,
@@ -2220,6 +2240,10 @@ void tlb_set_page(CPUState *env, target_ulong vaddr,
             }
         }
     }
+
+#ifdef MARSS_QEMU
+	ptl_add_phys_memory_mapping(env->cpu_index, addend & TARGET_PAGE_MASK, paddr & TARGET_PAGE_MASK);
+#endif
 
     index = (vaddr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
     env->iotlb[mmu_idx][index] = iotlb - vaddr;

@@ -32,6 +32,10 @@
 #define GEN_HELPER 1
 #include "helper.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 #define PREFIX_REPZ   0x01
 #define PREFIX_REPNZ  0x02
 #define PREFIX_LOCK   0x04
@@ -4068,6 +4072,16 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
     target_ulong next_eip, tval;
     int rex_w, rex_r;
 
+#ifdef MARSS_QEMU
+    if(ptl_start_sim_rip == pc_start) {
+      gen_jmp_im(pc_start - s->cs_base);
+      gen_helper_switch_to_sim();
+      gen_eob(s);
+      ptl_start_sim_rip = -1;
+      return s->pc;
+    }
+#endif
+
     if (unlikely(qemu_loglevel_mask(CPU_LOG_TB_OP)))
         tcg_gen_debug_insn_start(pc_start);
     s->pc = pc_start;
@@ -7700,6 +7714,47 @@ void optimize_flags_init(void)
 #include "helper.h"
 }
 
+#ifdef MARSS_QEMU
+static TCGArg *simpoint_arg;
+static int simpoint_count_label;
+
+static void gen_simpoint_check_start(CPUState *env, DisasContext *dc)
+{
+    if (env->simpoint_decr) {
+
+        /* Check if we are counting user level instructions or not */
+        if (ptl_fast_fwd_enabled == 2 && dc->cpl != 3) {
+            return;
+        }
+
+        TCGv_i64 count;
+
+        simpoint_count_label = gen_new_label();
+        count = tcg_temp_local_new_i64();
+        tcg_gen_ld_i64(count, cpu_env, offsetof(CPUX86State, simpoint_decr));
+        simpoint_arg = gen_opparam_ptr + 1;
+        tcg_gen_subi_i64(count, count, 0xdeadbeef);
+
+        tcg_gen_brcondi_i64(TCG_COND_LT, count, 0, simpoint_count_label);
+        tcg_gen_st_i64(count, cpu_env, offsetof(CPUState, simpoint_decr));
+        tcg_temp_free_i64(count);
+    }
+}
+
+static void gen_simpoint_check_end(CPUState* env, DisasContext *dc, int num_insns)
+{
+    if (env->simpoint_decr) {
+        if (ptl_fast_fwd_enabled == 2 && dc->cpl != 3) {
+            return;
+        }
+
+        *simpoint_arg = num_insns;
+        gen_set_label(simpoint_count_label);
+        tcg_gen_exit_tb((long)(dc->tb) + 2);
+    }
+}
+#endif
+
 /* generate intermediate code in gen_opc_buf and gen_opparam_buf for
    basic block 'tb'. If search_pc is TRUE, also generate PC
    information for each intermediate instruction. */
@@ -7791,6 +7846,9 @@ static inline void gen_intermediate_code_internal(CPUState *env,
         max_insns = CF_COUNT_MASK;
 
     gen_icount_start();
+#ifdef MARSS_QEMU
+    gen_simpoint_check_start(env, dc);
+#endif
     for(;;) {
         if (unlikely(!QTAILQ_EMPTY(&env->breakpoints))) {
             QTAILQ_FOREACH(bp, &env->breakpoints, entry) {
@@ -7848,6 +7906,9 @@ static inline void gen_intermediate_code_internal(CPUState *env,
     }
     if (tb->cflags & CF_LAST_IO)
         gen_io_end();
+#ifdef MARSS_QEMU
+    gen_simpoint_check_end(env, dc, num_insns);
+#endif
     gen_icount_end(tb, num_insns);
     *gen_opc_ptr = INDEX_op_end;
     /* we don't forget to fill the last values */

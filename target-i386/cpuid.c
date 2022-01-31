@@ -27,6 +27,10 @@
 #include "qemu-option.h"
 #include "qemu-config.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 /* feature flags taken from "Intel Processor Identification and the CPUID
  * Instruction" and AMD's "CPUID Specification".  In cases of disagreement
  * between feature naming conventions, aliases may be added.
@@ -1032,6 +1036,10 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
                    uint32_t *eax, uint32_t *ebx,
                    uint32_t *ecx, uint32_t *edx)
 {
+#ifdef MARSS_QEMU
+    if(ptl_cpuid(index, count, eax, ebx, ecx, edx) > 0)
+        return;
+#endif
     /* test if maximum index reached */
     if (index & 0x80000000) {
         if (index > env->cpuid_xlevel)

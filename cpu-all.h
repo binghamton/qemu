@@ -402,7 +402,7 @@ static inline void stfq_le_p(void *ptr, float64 v)
 
 static inline int lduw_be_p(const void *ptr)
 {
-#if defined(__i386__)
+#if defined(__i386__) || defined(__x86_64__)
     int val;
     asm volatile ("movzwl %1, %0\n"
                   "xchgb %b0, %h0\n"
@@ -417,7 +417,7 @@ static inline int lduw_be_p(const void *ptr)
 
 static inline int ldsw_be_p(const void *ptr)
 {
-#if defined(__i386__)
+#if defined(__i386__) || defined(__x86_64__)
     int val;
     asm volatile ("movzwl %1, %0\n"
                   "xchgb %b0, %h0\n"
@@ -968,5 +968,9 @@ int cpu_memory_rw_debug(CPUState *env, target_ulong addr,
 void cpu_inject_x86_mce(CPUState *cenv, int bank, uint64_t status,
                         uint64_t mcg_status, uint64_t addr, uint64_t misc,
                         int broadcast);
+
+#ifdef MARSS_QEMU
+void tlb_protect_code(ram_addr_t ram_addr);
+#endif
 
 #endif /* CPU_ALL_H */

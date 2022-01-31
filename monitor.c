@@ -62,6 +62,10 @@
 #endif
 #include "ui/qemu-spice.h"
 
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
+
 //#define DEBUG
 //#define DEBUG_COMPLETION
 
@@ -89,6 +93,9 @@
  *              user mode accepts an optional ms, us, ns suffix,
  *              which divides the value by 1e3, 1e6, 1e9, respectively
  * '/'          optional gdb-like print format (like "/10x")
+#ifdef MARSS_QEMU
+ * 'W'			Whole string - pass it to the calling function
+#endif
  *
  * '?'          optional type (for all types, except '/')
  * '.'          other form of optional type (for 'i' and 'l')
@@ -1258,6 +1265,15 @@ static int do_stop(Monitor *mon, const QDict *qdict, QObject **ret_data)
     vm_stop(EXCP_INTERRUPT);
     return 0;
 }
+
+#ifdef MARSS_QEMU
+static void do_simulate(Monitor *mon, const QDict *qdict)
+{
+  const char *args = qdict_get_str(qdict, "options");
+  monitor_printf(mon, "simulation options received:%s\n", args);
+  ptl_machine_configure(args);
+}
+#endif
 
 static void encrypted_bdrv_it(void *opaque, BlockDriverState *bs);
 
@@ -4023,6 +4039,17 @@ static const mon_cmd_t *monitor_parse_command(Monitor *mon,
         c = *typestr;
         typestr++;
         switch(c) {
+#ifdef MARSS_QEMU
+        case 'W':
+            {
+                while(qemu_isspace(*p))
+                    p++;
+                pstrcpy(buf, strlen(p)+1, p);//get_str(buf, sizeof(buf), &p);
+                qdict_put(qdict, key, qstring_from_str(buf));
+                p += strlen(buf);
+            }
+            break;
+#endif
         case 'F':
         case 'B':
         case 's':

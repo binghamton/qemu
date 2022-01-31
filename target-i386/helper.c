@@ -28,6 +28,9 @@
 #include "qemu-common.h"
 #include "kvm.h"
 #include "kvm_x86.h"
+#ifdef MARSS_QEMU
+#include <ptl-qemu.h>
+#endif
 
 //#define DEBUG_MMU
 
@@ -1203,7 +1206,11 @@ CPUX86State *cpu_x86_init(const char *cpu_model)
     CPUX86State *env;
     static int inited;
 
+#ifdef MARSS_QEMU
+    env = ptl_create_new_context();
+#else
     env = qemu_mallocz(sizeof(CPUX86State));
+#endif
     cpu_exec_init(env);
     env->cpu_model_str = cpu_model;
 

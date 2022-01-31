@@ -129,6 +129,10 @@ extern int icount_time_shift;
 extern int64_t qemu_icount_bias;
 int64_t cpu_get_icount(void);
 
+#ifdef MARSS_QEMU
+void cpu_set_sim_ticks(void);
+#endif
+
 /*******************************************/
 /* host CPU ticks (if available) */
 
