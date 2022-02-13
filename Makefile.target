@@ -338,6 +338,8 @@ obj-y += $(addprefix ../libdis/, $(libdis-y))
 obj-y += $(libobj-y)
 obj-y += $(addprefix $(HWDIR)/, $(hw-obj-y))
 
+LIBS+=-Wl,--whole-archive -lptlsim -Wl,--no-whole-archive
+
 endif # CONFIG_SOFTMMU
 
 obj-y += $(addprefix ../, $(trace-obj-y))

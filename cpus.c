@@ -568,7 +568,9 @@ static void qemu_kvm_eat_signal(CPUState *env, int timeout)
         switch (r) {
         case SIGBUS:
 #ifdef TARGET_I386
+#ifdef CONFIG_KVM
             if (kvm_on_sigbus_vcpu(env, siginfo.si_code, siginfo.si_addr))
+#endif
 #endif
                 sigbus_reraise();
             break;

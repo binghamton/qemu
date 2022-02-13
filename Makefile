@@ -24,8 +24,13 @@ endif
 Makefile: ;
 configure: ;
 
+generated-sources: $(GENERATED_HEADERS) $(GENERATED_SOURCES)
+	$(call quiet-command, for d in $(TARGET_DIRS); do \
+	$(MAKE) $(SUBDIR_MAKEFLAGS) TARGET_DIR=$$d/ -C $$d config-target.h || exit 1 ; \
+	done)
+
 .PHONY: all clean cscope distclean dvi html info install install-doc \
-	pdf recurse-all speed tar tarbin test build-all
+	pdf recurse-all speed tar tarbin test build-all generated-sources
 
 $(call set-vpath, $(SRC_PATH):$(SRC_PATH)/hw)
 
